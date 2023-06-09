@@ -90,6 +90,18 @@ func (this *IPropertyParser) ExecutorDirectory() (string, error) {
 	return this.GetString("ignis.executor.directory")
 }
 
+func (this *IPropertyParser) Host() (string, error) {
+	return this.GetString("ignis.executor.host")
+}
+
+func (this *IPropertyParser) GetHdfsPath() (string, error) {
+	return this.GetString("ignis.hdfs.namenode")
+}
+
+func (this *IPropertyParser) PreserveOrder() (bool, error) {
+	return this.GetBool("ignis.hdfs.preserve.order")
+}
+
 func (this *IPropertyParser) GetString(key string) (string, error) {
 	value, ok := this.properties[key]
 	if ok {
