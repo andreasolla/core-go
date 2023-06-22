@@ -282,7 +282,7 @@ func (this *IIOImpl) plainOrTextFile(path string, minPartitions int64, delim str
 func (this *IIOImpl) textFileHDFS(path string, minPartitions int64) error {
 	order, _ := this.executorData.GetProperties().PreserveOrder()
 
-	if order {
+	if !order {
 		return this.hdfsNotOrdering(path)
 	}
 
@@ -485,6 +485,11 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 		executorBlocksArray[i] = int(executorBlocks[i].GetBlockId())
 	}
 
+	if len(executorBlocks) <= 0 {
+		executorBlocksArray = make([]int, 1)
+		executorBlocksArray[0] = -1
+	}
+
 	// Array de posiciones donde se guardaran los bloques de cada ejecutor
 	executorsBlocksPos := make([]C.int, executors)
 	executorsBlocksPos[0] = 0
@@ -499,7 +504,7 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 	}
 	// Obtengo todos los bloques de todos los ejecutores con allgatherv
 	allBlocksArray := make([]int, totalBlocks)
-	aux := len(executorBlocks)
+	aux := len(executorBlocksArray)
 	impi.MPI_Allgatherv(unsafe.Pointer(&executorBlocksArray[0]), impi.C_int(C.int(aux)), impi.MPI_INT, unsafe.Pointer(&allBlocksArray[0]), (*impi.C_int)(&executorsNBlocks[0]), (*impi.C_int)(&executorsBlocksPos[0]), impi.MPI_INT, this.executorData.GetContext().MpiGroup())
 
 	allBlocks := make([]interface{}, 0)
@@ -507,7 +512,9 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 	for i := 0; i < executors; i++ {
 		blockInfos := make([]int, 0)
 		for j := 0; j < int(executorsNBlocks[i]); j++ {
-			blockInfos = append(blockInfos, allBlocksArray[int(executorsBlocksPos[i])+j])
+			if allBlocksArray[int(executorsBlocksPos[i])+j] != -1 {
+				blockInfos = append(blockInfos, allBlocksArray[int(executorsBlocksPos[i])+j])
+			}
 		}
 		pair := []interface{}{executorsOrder[i], blockInfos}
 		allBlocks = append(allBlocks, pair)
