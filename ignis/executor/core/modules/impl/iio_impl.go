@@ -453,7 +453,7 @@ func sorted(data []interface{}, less func(i, j int) bool) []interface{} {
 	return sortedData
 }
 
-func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.BlockInfo {
+func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) []uint64 {
 	logger.Info("IO: distributing blocks")
 	executorId := this.executorData.GetContext().ExecutorId() 
 	executors := this.executorData.GetContext().Executors()
@@ -528,19 +528,19 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 
 	// Reparto de bloques por IP
 	takenBlocks := make([]uint64, 0)
-	assignedBlocks := make(map[uint64]hdfs.BlockInfo)
+	assignedBlocks := make([]uint64, 0)
 	numberBlocks := make([]int, executors)
 	for i := 0; i < executors; i++ {
 		taken := 0
 		pos := 0
 		nBlocks := 0
-		for len(sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)) > 0 && taken < blocksPerExecutor && pos < len(sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)) {
-			if _, exists := contains(takenBlocks, sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)[pos].GetBlockId()); !exists {
-				takenBlocks = append(takenBlocks, sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)[pos].GetBlockId())
+		for len(sortedData[i].([]interface{})[1].([]int)) > 0 && taken < blocksPerExecutor && pos < len(sortedData[i].([]interface{})[1].([]int)) {
+			if _, exists := contains(takenBlocks, uint64(sortedData[i].([]interface{})[1].([]int)[pos])); !exists {
+				takenBlocks = append(takenBlocks, uint64(sortedData[i].([]interface{})[1].([]int)[pos]))
 				taken++
 				nBlocks++
 				if sortedData[i].([]interface{})[0].(int) == executorId {
-					assignedBlocks[sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)[pos].GetBlockId()] = sortedData[i].([]interface{})[1].([]hdfs.BlockInfo)[pos]
+					assignedBlocks = append(assignedBlocks, uint64(sortedData[i].([]interface{})[1].([]int)[pos]))
 				}
 			}
 			pos++
@@ -549,10 +549,10 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 	}
 
 	// Bloques que no han sido asignados
-	lostBlocks := make([]hdfs.BlockInfo, 0)
+	lostBlocks := make([]uint64, 0)
 	for i := 0; i < len(blocks); i++ {
 		if _, exists := contains(takenBlocks, blocks[i].GetBlockId()); !exists {
-			lostBlocks = append(lostBlocks, blocks[i])
+			lostBlocks = append(lostBlocks, blocks[i].GetBlockId())
 		}
 	}
 
@@ -566,7 +566,7 @@ func (this *IIOImpl) assignedBlocks(blocks []hdfs.BlockInfo) map[uint64]hdfs.Blo
 		}
 
 		for len(assignedBlocks) < blocksPerExecutor && len(lostBlocks) > i {
-			assignedBlocks[lostBlocks[i].GetBlockId()] = lostBlocks[i]
+			assignedBlocks = append(assignedBlocks, lostBlocks[i])
 			i++
 		}
 	}
@@ -633,7 +633,7 @@ func (this *IIOImpl) hdfsNotOrdering(path string) error {
 	myBlocks := make([]hdfs.BlockInfo, 0)
 
 	for i := 0; i < len(blocks); i++ {
-		if _, ok := blocksToRead[blocks[i].GetBlockId()]; ok {
+		if _, exists := contains(blocksToRead, blocks[i].GetBlockId()); exists {
 			myBlocks = append(myBlocks, blocks[i])
 		}
 	}
